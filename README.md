@@ -6,4 +6,4 @@ Build: `go build -o gitignore.exe main.go`
 
 Usage: `gitignore <lang> [...langs]`
 
-Example: `gitignore sass wordpress`
+Example: `gitignore node sass`
