@@ -1,0 +1,1 @@
+go build -o bin\gitignore.exe main.go

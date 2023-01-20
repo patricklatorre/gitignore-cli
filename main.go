@@ -25,16 +25,22 @@ type TreeNode struct {
 }
 
 func main() {
-	fmt.Println("> Getting options from @github/gitignore")
+	args := os.Args[1:]
+
+	if len(args) == 0 {
+		PrintHelp()
+		os.Exit(0)
+	}
+
+	fmt.Println("> Downloading options from @github/gitignore")
 
 	// Download options from github/gitignore
 	options, err := GetOptions()
 	if err != nil {
-		fmt.Println("> Failed to get options")
+		fmt.Println("> Failed to download options")
 		panic(err)
 	}
 
-	args := os.Args[1:]
 	mergedContent := ""
 	successes := 0
 
@@ -64,7 +70,13 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Printf("> Added %d starters to .gitignore", successes)
+	fmt.Printf("> Added %d entries to .gitignore", successes)
+}
+
+func PrintHelp() {
+	fmt.Print("" +
+		"Usage:    gitignore <lang> [...langs]\n" +
+		"Example:  gitignore node sass\n")
 }
 
 func GetOptions() (*map[string]string, error) {

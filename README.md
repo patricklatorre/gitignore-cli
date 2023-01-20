@@ -1,9 +1,12 @@
-Just testing out understanding of golang's std lib.
+Dead simple tool for creating .gitignore files.
 
----
 
-Build: `go build -o gitignore.exe main.go`
+## Usage
+```bash
+#
+# gitignore <lang> [...langs]
+#
 
-Usage: `gitignore <lang> [...langs]`
-
-Example: `gitignore node sass`
+# Example
+$ gitignore node sass jetbrains
+```
