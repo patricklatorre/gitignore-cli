@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,15 +10,17 @@ import (
 	"strings"
 )
 
+const Version = "0.1.1"
+
 type RepoJson struct {
 	Sha string `json:"sha"`
 }
 
-type TreeJson struct {
-	Tree []TreeNode `json:"tree"`
+type RepoTreeJson struct {
+	Tree []RepoNodeJson `json:"tree"`
 }
 
-type TreeNode struct {
+type RepoNodeJson struct {
 	Path string `json:"path"`
 	Sha  string `json:"sha"`
 	Type string `json:"type"`
@@ -25,42 +28,50 @@ type TreeNode struct {
 }
 
 func main() {
-	args := os.Args[1:]
+	// Parse args
+	flagHelp := flag.Bool("h", false, "Print the help screen")
+	flagVersion := flag.Bool("v", false, "Print the gitignore version")
+	flag.Usage = PrintUsageAndExit
+	flag.Parse()
 
-	if len(args) == 0 {
-		PrintHelp()
-		os.Exit(0)
+	args := flag.Args()
+
+	// Handle flags
+	if *flagVersion {
+		PrintVersionAndExit()
+	} else if *flagHelp || len(args) == 0 {
+		PrintUsageAndExit()
 	}
 
-	fmt.Println("> Downloading options from @github/gitignore")
+	fmt.Println("> Downloading choices from @github/gitignore")
 
-	// Download options from github/gitignore
-	options, err := GetOptions()
+	// Download choices from github/gitignore
+	choices, err := GetChoices()
 	if err != nil {
-		fmt.Println("> Failed to download options")
+		fmt.Println("> Failed to download choices")
 		panic(err)
 	}
 
 	mergedContent := ""
 	successes := 0
 
-	// Download each valid arg and store content
+	// Download each valid arg (choice) and store content
 	for _, arg := range args {
 		key := strings.ToLower(arg)
 
-		name, ok := (*options)[key]
+		choiceName, ok := (*choices)[key]
 		if !ok {
 			fmt.Println("  ✖ " + key)
 			continue
 		}
 
-		content, err := DownloadFile(name)
+		choiceContent, err := DownloadChoice(choiceName)
 		if err != nil {
 			fmt.Println("  ✖ " + arg + " (Download failed)")
 		}
 
-		mergedContent += *content + "\n"
-		fmt.Println("  ✔ " + name)
+		mergedContent += *choiceContent + "\n"
+		fmt.Println("  ✔ " + choiceName)
 		successes++
 	}
 
@@ -70,22 +81,30 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Printf("> Added %d entries to .gitignore", successes)
+	fmt.Printf("> Added %d entries to .gitignore\n", successes)
 }
 
-func PrintHelp() {
+func PrintUsageAndExit() {
 	fmt.Print("" +
 		"Usage:    gitignore <lang> [...langs]\n" +
-		"Example:  gitignore node sass\n")
+		"Example:  gitignore node sass\n\n")
+
+	flag.PrintDefaults()
+	os.Exit(0)
 }
 
-func GetOptions() (*map[string]string, error) {
+func PrintVersionAndExit() {
+	fmt.Printf("Gitignore CLI %s\n", Version)
+	os.Exit(0)
+}
+
+func GetChoices() (*map[string]string, error) {
 	var (
 		res     *http.Response
 		body    []byte
 		repo    *RepoJson
-		tree    *TreeJson
-		options map[string]string
+		tree    *RepoTreeJson
+		choices map[string]string
 		err     error
 	)
 
@@ -123,20 +142,20 @@ func GetOptions() (*map[string]string, error) {
 		return nil, err
 	}
 
-	options = make(map[string]string)
+	choices = make(map[string]string)
 
 	for _, node := range tree.Tree {
 		if strings.HasSuffix(node.Path, ".gitignore") && node.Type == "blob" {
 			name := strings.TrimSuffix(node.Path, ".gitignore")
 			nameLower := strings.ToLower(name)
-			options[nameLower] = name
+			choices[nameLower] = name
 		}
 	}
 
-	return &options, nil
+	return &choices, nil
 }
 
-func DownloadFile(name string) (*string, error) {
+func DownloadChoice(name string) (*string, error) {
 	var (
 		res  *http.Response
 		body []byte
