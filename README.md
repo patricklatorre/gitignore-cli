@@ -8,5 +8,5 @@ Dead simple tool for creating .gitignore files.
 #
 
 # Example
-$ gitignore node sass jetbrains
+$ gitignore node sass
 ```
