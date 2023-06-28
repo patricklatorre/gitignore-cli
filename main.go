@@ -8,9 +8,10 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 )
 
-const Version = "0.1.1"
+const Version = "0.1.2"
 
 type RepoJson struct {
 	Sha string `json:"sha"`
@@ -29,9 +30,9 @@ type RepoNodeJson struct {
 
 func main() {
 	// Parse args
+	flag.Usage = PrintUsageAndExit
 	flagHelp := flag.Bool("h", false, "Print the help screen")
 	flagVersion := flag.Bool("v", false, "Print the gitignore version")
-	flag.Usage = PrintUsageAndExit
 	flag.Parse()
 
 	args := flag.Args()
@@ -52,28 +53,53 @@ func main() {
 		panic(err)
 	}
 
-	mergedContent := ""
-	successes := 0
+	var (
+		wg sync.WaitGroup
 
-	// Download each valid arg (choice) and store content
+		mergedContentMu sync.Mutex
+		mergedContent   string
+
+		totalDoneMu sync.Mutex
+		totalDone   int
+	)
+
+	// Add each arg as a job
+	wg.Add(len(args))
+
+	// Download each valid arg
 	for _, arg := range args {
+		arg := arg
 		key := strings.ToLower(arg)
 
 		choiceName, ok := (*choices)[key]
 		if !ok {
 			fmt.Println("  ✖ " + key)
+			wg.Done()
 			continue
 		}
 
-		choiceContent, err := DownloadChoice(choiceName)
-		if err != nil {
-			fmt.Println("  ✖ " + arg + " (Download failed)")
-		}
+		// Download concurrently
+		go func() {
+			choiceContent, err := DownloadChoice(choiceName)
+			if err != nil {
+				fmt.Println("  ✖ " + arg + " (Download failed)")
+				wg.Done()
+			}
 
-		mergedContent += *choiceContent + "\n"
-		fmt.Println("  ✔ " + choiceName)
-		successes++
+			mergedContentMu.Lock()
+			mergedContent += *choiceContent + "\n"
+			mergedContentMu.Unlock()
+
+			totalDoneMu.Lock()
+			totalDone++
+			totalDoneMu.Unlock()
+
+			fmt.Println("  ✔ " + choiceName)
+			wg.Done()
+		}()
 	}
+
+	wg.Wait()
 
 	err = SaveContentToDisk(&mergedContent)
 	if err != nil {
@@ -81,21 +107,7 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Printf("> Added %d entries to .gitignore\n", successes)
-}
-
-func PrintUsageAndExit() {
-	fmt.Print("" +
-		"Usage:    gitignore <lang> [...langs]\n" +
-		"Example:  gitignore node sass\n\n")
-
-	flag.PrintDefaults()
-	os.Exit(0)
-}
-
-func PrintVersionAndExit() {
-	fmt.Printf("Gitignore CLI %s\n", Version)
-	os.Exit(0)
+	fmt.Printf("> Added %d entries to .gitignore\n", totalDone)
 }
 
 func GetChoices() (*map[string]string, error) {
@@ -194,4 +206,18 @@ func SaveContentToDisk(content *string) error {
 	}
 
 	return nil
+}
+
+func PrintUsageAndExit() {
+	fmt.Print("" +
+		"Usage:    gitignore <lang> [...langs]\n" +
+		"Example:  gitignore node sass\n\n")
+
+	flag.PrintDefaults()
+	os.Exit(0)
+}
+
+func PrintVersionAndExit() {
+	fmt.Printf("Gitignore CLI %s\n", Version)
+	os.Exit(0)
 }
