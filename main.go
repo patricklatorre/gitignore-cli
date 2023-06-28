@@ -181,14 +181,14 @@ func DownloadChoice(name string) (*string, error) {
 }
 
 func SaveContentToDisk(content *string) error {
-	fo, err := os.Create(".gitignore")
+	f, err := os.OpenFile(".gitignore", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 
-	defer fo.Close()
+	defer f.Close()
 
-	_, err = fo.Write([]byte(*content))
+	_, err = f.WriteString(*content)
 	if err != nil {
 		return err
 	}
